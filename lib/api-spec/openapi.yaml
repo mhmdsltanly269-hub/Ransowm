@@ -1,0 +1,258 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: rids
+    description: RIDS ransomware detection operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /rids/health:
+    get:
+      operationId: getRidsHealth
+      tags: [rids]
+      summary: Get RIDS health and model status
+      responses:
+        "200":
+          description: RIDS health
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RidsHealth"
+  /rids/model-info:
+    get:
+      operationId: getRidsModelInfo
+      tags: [rids]
+      summary: Get loaded model metadata
+      responses:
+        "200":
+          description: Model metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelInfo"
+  /rids/predict:
+    post:
+      operationId: predictRansomware
+      tags: [rids]
+      summary: Predict ransomware from extracted model features
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PredictInput"
+      responses:
+        "200":
+          description: Prediction result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PredictionResponse"
+        "400":
+          description: Invalid input
+  /rids/predict-batch:
+    post:
+      operationId: predictRansomwareBatch
+      tags: [rids]
+      summary: Predict ransomware for multiple samples
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchPredictInput"
+      responses:
+        "200":
+          description: Batch prediction result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchPredictionResponse"
+        "400":
+          description: Invalid input
+  /rids/upload:
+    post:
+      operationId: uploadRansomwareFile
+      tags: [rids]
+      summary: Extract features from and analyze a raw file
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/FileUploadInput"
+      responses:
+        "200":
+          description: File analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilePredictionResponse"
+        "400":
+          description: Invalid file
+  /rids/history:
+    get:
+      operationId: getRidsHistory
+      tags: [rids]
+      summary: Get recent prediction history
+      responses:
+        "200":
+          description: Recent history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryResponse"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    RidsHealth:
+      type: object
+      properties:
+        status: { type: string }
+        models_loaded: { type: boolean }
+        features_count: { type: integer }
+        storage_configured: { type: boolean }
+        student: { type: string }
+        project: { type: string }
+        timestamp: { type: string }
+      required: [status, models_loaded, features_count, storage_configured, student, project, timestamp]
+    ModelInfo:
+      type: object
+      properties:
+        model_type: { type: string }
+        features_count: { type: integer }
+        features_list:
+          type: array
+          items: { type: string }
+        feature_importance:
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/FeatureImportance"
+        status: { type: string }
+        student: { type: string }
+        project: { type: string }
+      required: [model_type, features_count, features_list, feature_importance, status, student, project]
+    FeatureImportance:
+      type: object
+      additionalProperties: true
+    FeatureMap:
+      type: object
+      additionalProperties:
+        type: number
+    PredictInput:
+      type: object
+      properties:
+        sample:
+          $ref: "#/components/schemas/FeatureMap"
+        samples:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeatureMap"
+        explain: { type: boolean }
+      required: []
+    PredictionResult:
+      type: object
+      properties:
+        predictions:
+          type: array
+          items: { type: integer }
+        probabilities:
+          type: array
+          items: { type: number }
+        model_used: { type: string }
+      required: [predictions, probabilities, model_used]
+    PredictionResponse:
+      type: object
+      properties:
+        status: { type: string }
+        timestamp: { type: string }
+        student: { type: string }
+        project: { type: string }
+        samples_count: { type: integer }
+        results:
+          $ref: "#/components/schemas/PredictionResult"
+        explanations:
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/Explanation"
+        model_info:
+          type: object
+          additionalProperties: true
+      required: [status, timestamp, student, project, samples_count, results, explanations, model_info]
+    Explanation:
+      type: object
+      additionalProperties: true
+    BatchPredictInput:
+      type: object
+      properties:
+        samples:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeatureMap"
+      required: [samples]
+    BatchPredictionItem:
+      type: object
+      additionalProperties: true
+    BatchPredictionResponse:
+      type: object
+      properties:
+        status: { type: string }
+        timestamp: { type: string }
+        student: { type: string }
+        project: { type: string }
+        total_samples: { type: integer }
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/BatchPredictionItem"
+      required: [status, timestamp, student, project, total_samples, results]
+    FileUploadInput:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+      required: [file]
+    FilePredictionResponse:
+      type: object
+      additionalProperties: true
+    HistoryItem:
+      type: object
+      additionalProperties: true
+    HistoryResponse:
+      type: object
+      properties:
+        status: { type: string }
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoryItem"
+        count: { type: integer }
+      required: [status, history, count]
+
